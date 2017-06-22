@@ -1,4 +1,4 @@
-<h1>BitBay-Sell-Bot</h1>
+<h1>BitBay-Sell-Bot <b>for PHP CLI</b></h1>
 <b>How It Works</b> <br />
 Reduces the lowest order on the order book by -0.01 (See line 59: <i>$sell_price = $highest_price-0.01;</i>)<br />
 <br />
