@@ -29,12 +29,26 @@
 		curl_setopt($curl, CURLOPT_POST, true);
 		curl_setopt($curl, CURLOPT_POSTFIELDS, $post);
 		curl_setopt($curl, CURLOPT_HTTPHEADER, $headers);
-		$ret = curl_exec($curl);
+		$ret = json_decode(curl_exec($curl));
+		if(isset($ret->code) && $ret->code != 200){
+			if(isset($ret->message) && $ret->message){
+				die("\n$ret->message");
+			} else {
+				die("\nan unknown error has occurred.");
+			}
+		}
 		return $ret;
 	}
 
-	$min_sell_price = 7325; //minimum amount to sell for
-	$min_difference = -10.7; // minimum difference to adjust;
+	$options = getopt('',array("minsellprice:","mindiff:"));
+	if(!isset($options['minsellprice']) || !$options['minsellprice']){
+		die("Please specify a minimum sell price using the --minsellprice flag. ex : --minsellprice=4232");
+	}
+	$min_sell_price = $options['minsellprice']; //minimum amount to sell for
+	$min_difference = -10; // minimum difference to adjust;
+	if(isset($options['mindiff']) && $options['mindiff']){
+		$min_difference = $options['mindiff'];
+	}
 	echo "
    _____ ________    __    _____   ________   ____ ____________   __   __   __   __   __   __   __
   / ___// ____/ /   / /   /  _/ | / / ____/  / __ )_  __/ ____/  / /  / /  / /  / /  / /  / /  / /
@@ -42,7 +56,7 @@
  ___/ / /___/ /___/ /____/ // /|  / /_/ /  / /_/ // / / /___   /_/  /_/  /_/  /_/  /_/  /_/  /_/
 /____/_____/_____/_____/___/_/ |_/\____/  /_____//_/  \____/  (_)  (_)  (_)  (_)  (_)  (_)  (_)
                                                                                                   ";
-	echo "\033[35m SELLING BTC FROM $min_sell_price PLN TYPE OKAY TO CONFIRM \033[0m \n";
+	echo "\nSELLING BTC FROM {$min_sell_price}PLN and {$min_difference}PLN minimum price difference PLN TYPE OKAY TO CONFIRM\n";
 	$confirmation = trim(fgets(STDIN));
 
 	if("OKAY" === $confirmation){
@@ -50,16 +64,19 @@
 		echo "\nmoving on!";
 		while(1){
 			try{
-
 				$order_cancelled = 0;
 				$orders = json_decode(file_get_contents("https://bitbay.net/API/Public/BTCPLN/orderbook.json"));
 				$asks = $orders->asks;
 				$highest = $asks[0]; //the highest ask
 				$highest_price = $highest[0]; //the highest ask price
 				$sell_price = $highest_price-0.01;
-				$my_offers = json_decode(BitBay_Trading_Api('orders',array('limit'=>3)));
+				$my_offers = BitBay_Trading_Api('orders',array('limit'=>3));
 				$active_orders = array();
 				//sort active orders into an array
+				if(!$my_offers){
+					echo "\nno active orders";
+					continue;
+				}
 				$counter = 0;
 				foreach($my_offers as $my_offer){
 					if($my_offer->status == 'active' && $my_offer->payment_currency == 'PLN'){
@@ -86,7 +103,7 @@
 						}
 					}
 				}
-				$tosell = json_decode(BitBay_Trading_Api('info',array('BTC')));
+				$tosell = BitBay_Trading_Api('info',array('BTC'));
 				$tosell = $tosell->balances->BTC->available;
 				echo "\n BALANCE == $tosell";
 				//$tosell = 0.12345; //amount of BTC to sell -- 0.1 for testing
@@ -96,12 +113,12 @@
 						$difference = $highest_price - $sell_price;
 						echo "\n DIFFERENCE is $difference";
 						if($difference < $min_difference){
-							echo "\033[31m ABORTING -- DIFFERENCE TOO HIGH -- $difference \033[0m \n";
+							echo "ABORTING -- DIFFERENCE TOO HIGH -- $difference\n";
 							continue;
 							} else {
 							echo "\nPLACING NEW ORDER, SELLING 4BTC for $sell_price";
 							if($sell_price >= $min_sell_price){
-								$res = json_decode(BitBay_Trading_Api('trade',array('type'=>'sell','currency'=>'BTC','amount'=>$tosell,'payment_currency'=>'PLN','rate'=>$sell_price)));
+								$res = BitBay_Trading_Api('trade',array('type'=>'sell','currency'=>'BTC','amount'=>$tosell,'payment_currency'=>'PLN','rate'=>$sell_price));
 								$res = $res->message;
 								echo "\n SELL RESULT: $res";
 							}
